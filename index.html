@@ -3,28 +3,1466 @@
 
 <head>
     <meta charset="utf-8" />
-    <title>YISL AR VR Workshop</title>
+    <title>VR Car Engine Assembly Simulator</title>
+    <meta name="description" content="An interactive 3D WebXR VR Car Engine Assembly Simulator using A-Frame for Meta Quest 3S and Desktop." />
+    <!-- A-Frame 1.7.1 CDN -->
     <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
+    <style>
+        /* Modern futuristic dark theme UI overlay */
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #05070f;
+            color: #ffffff;
+            user-select: none;
+        }
+
+        #startOverlay, #completionOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 9999;
+            background: radial-gradient(circle at center, rgba(10, 15, 43, 0.95) 0%, rgba(5, 7, 15, 0.98) 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            transition: opacity 0.5s ease;
+            backdrop-filter: blur(12px);
+        }
+
+        #completionOverlay {
+            display: none;
+            background: radial-gradient(circle at center, rgba(15, 10, 35, 0.95) 0%, rgba(5, 5, 15, 0.98) 100%);
+        }
+
+        .container {
+            max-width: 600px;
+            padding: 40px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(0, 243, 255, 0.2);
+            box-shadow: 0 0 40px rgba(0, 243, 255, 0.1), inset 0 0 20px rgba(255, 255, 255, 0.02);
+            animation: panelFadeIn 0.8s ease-out;
+        }
+
+        h1 {
+            font-size: 2.8rem;
+            margin: 0 0 15px 0;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            background: linear-gradient(45deg, #00f3ff, #ff00a0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 30px rgba(0, 243, 255, 0.2);
+        }
+
+        p {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            color: #8b9bb4;
+            margin-bottom: 30px;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+        }
+
+        button {
+            padding: 14px 36px;
+            font-size: 1rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #ffffff;
+            background: linear-gradient(135deg, #1e295d 0%, #101530 100%);
+            border: 1px solid #00f3ff;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.1);
+        }
+
+        button:hover {
+            background: linear-gradient(135deg, #00f3ff 0%, #004a55 100%);
+            box-shadow: 0 0 25px rgba(0, 243, 255, 0.4);
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        button.secondary {
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: none;
+        }
+
+        button.secondary:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.6);
+            box-shadow: none;
+        }
+
+        /* Desktop Controls Info overlay hud */
+        #desktopHud {
+            position: absolute;
+            bottom: 25px;
+            left: 25px;
+            background: rgba(10, 15, 35, 0.85);
+            border: 1px solid rgba(0, 243, 255, 0.15);
+            padding: 15px 20px;
+            border-radius: 10px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            color: #00f3ff;
+            pointer-events: none;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            backdrop-filter: blur(5px);
+        }
+
+        .hud-line {
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+        }
+
+        .hud-key {
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 1px 5px;
+            border-radius: 3px;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+        }
+
+        @keyframes panelFadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+    </style>
 </head>
 
 <body>
-    <a-scene>
 
-        <a-sky color="cyan"></a-sky>
-        <a-box position="-1 -0.5 -3" rotation="0 45 0" color="#4CC3D9"></a-box>
-        <a-sphere position="0 0.25 -5" radius="1.25" color="#EF2D5E"></a-sphere>
-        <a-cylinder position="1 -0.25 -3" radius="0.5" height="1.5" color="#FFC65D"></a-cylinder>
-        <a-plane position="0 -1 -4" rotation="-90 0 0" width="4" height="4" color="#7BC8A4"></a-plane>
+    <!-- 2D HUD Info for Desktop Play -->
+    <div id="desktopHud">
+        <div class="hud-line"><span>Move</span> <span class="hud-key">W A S D</span></div>
+        <div class="hud-line"><span>Look Around</span> <span class="hud-key">Mouse Drag</span></div>
+        <div class="hud-line"><span>Grab & Place Part</span> <span class="hud-key">Left Click Hold</span></div>
+    </div>
 
-        <a-image src="https://raw.githubusercontent.com/alluringxstalwart/SourceYISL/main/Landscape1.png"
-            position="0 5 -10" width="25" height="7.5"></a-image>
+    <!-- 2D Start Screen Overlay -->
+    <div id="startOverlay">
+        <div class="container">
+            <h1>Car Engine Assembly</h1>
+            <p>Welcome to the VR Engine Workshop. Learn the mechanics and assembly sequence of a simplified 4-cylinder car engine. Interact using VR controllers (trigger/grip) or on desktop via mouse and keyboard.</p>
+            <div class="btn-group">
+                <button onclick="startSimulation()">Start Simulation</button>
+                <button class="secondary" onclick="exitApp()">Exit</button>
+            </div>
+        </div>
+    </div>
 
-        <a-text value="YISL AR VR Workshop" position="0 9.5 -10" align="center" color="white" font="mozillavr"
-            width="10" height="5" anchor="center">
-        </a-text>
+    <!-- 2D Completion Overlay (Desktop fallback) -->
+    <div id="completionOverlay">
+        <div class="container" style="border-color: rgba(255, 0, 160, 0.3); box-shadow: 0 0 40px rgba(255, 0, 160, 0.15)">
+            <h1 style="background: linear-gradient(45deg, #ff00a0, #7000ff)">Assembly Complete!</h1>
+            <p>Congratulations! You have successfully assembled the entire 4-cylinder engine, installing the block, crankshaft, pistons, head, plugs, valve cover, manifolds, and oil pan.</p>
+            <div class="btn-group">
+                <button onclick="restartSimulation()" style="border-color: #ff00a0; box-shadow: 0 0 15px rgba(255, 0, 160, 0.2)">Restart</button>
+                <button class="secondary" onclick="exitApp()">Exit</button>
+            </div>
+        </div>
+    </div>
 
+    <!-- Web Audio API Synthesizer & Vector Blueprint Draw Scripts -->
+    <script>
+        // Web Audio Synthesizer for 100% self-contained sound effects
+        class AudioSynth {
+            constructor() {
+                this.ctx = null;
+            }
+            init() {
+                if (this.ctx) return;
+                this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            play(type) {
+                this.init();
+                if (!this.ctx) return;
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+                const now = this.ctx.currentTime;
+                
+                if (type === 'click') {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(1400, now);
+                    osc.frequency.exponentialRampToValueAtTime(1000, now + 0.03);
+                    gain.gain.setValueAtTime(0.06, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.03);
+                }
+                else if (type === 'grab') {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(450, now);
+                    osc.frequency.exponentialRampToValueAtTime(900, now + 0.06);
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.06);
+                }
+                else if (type === 'snap') {
+                    // Triangle metal clang
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(160, now);
+                    osc.frequency.exponentialRampToValueAtTime(50, now + 0.3);
+                    gain.gain.setValueAtTime(0.35, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                    
+                    // Noise burst for impact texture
+                    const bufferSize = this.ctx.sampleRate * 0.12;
+                    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                    const data = buffer.getChannelData(0);
+                    for (let i = 0; i < bufferSize; i++) {
+                        data[i] = Math.random() * 2 - 1;
+                    }
+                    const noise = this.ctx.createBufferSource();
+                    noise.buffer = buffer;
+                    const filter = this.ctx.createBiquadFilter();
+                    filter.type = 'bandpass';
+                    filter.frequency.value = 850;
+                    filter.Q.value = 2.5;
+                    const noiseGain = this.ctx.createGain();
+                    noiseGain.gain.setValueAtTime(0.18, now);
+                    noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+                    
+                    noise.connect(filter);
+                    filter.connect(noiseGain);
+                    noiseGain.connect(this.ctx.destination);
+                    noise.start(now);
+                    noise.stop(now + 0.12);
+                }
+                else if (type === 'wrong') {
+                    // Two short buzzing squares
+                    [0, 0.11].forEach((delay) => {
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        osc.type = 'square';
+                        osc.frequency.setValueAtTime(120, now + delay);
+                        gain.gain.setValueAtTime(0.12, now + delay);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.08);
+                        osc.connect(gain);
+                        gain.connect(this.ctx.destination);
+                        osc.start(now + delay);
+                        osc.stop(now + delay + 0.08);
+                    });
+                }
+                else if (type === 'complete') {
+                    // Success retro fanfare C5-E5-G5-C6
+                    const notes = [523.25, 659.25, 783.99, 1046.50];
+                    notes.forEach((freq, idx) => {
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(freq, now + idx * 0.09);
+                        gain.gain.setValueAtTime(0.2, now + idx * 0.09);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.09 + 0.22);
+                        osc.connect(gain);
+                        gain.connect(this.ctx.destination);
+                        osc.start(now + idx * 0.09);
+                        osc.stop(now + idx * 0.09 + 0.22);
+                    });
+                }
+            }
+        }
+        const synth = new AudioSynth();
 
+        // Draw blueprint vector schematic on Canvas Asset
+        function drawEngineBlueprint(canvas) {
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width;
+            const h = canvas.height;
+            
+            ctx.fillStyle = '#080c1d';
+            ctx.fillRect(0, 0, w, h);
+            
+            // Neon Blueprint Grid
+            ctx.strokeStyle = 'rgba(0, 243, 255, 0.06)';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < w; x += 20) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+            }
+            for (let y = 0; y < h; y += 20) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+            }
+            
+            // Draw schematic components
+            const cx = w / 2;
+            const cy = h / 2 + 10;
+            ctx.strokeStyle = '#00f3ff';
+            ctx.lineWidth = 2.5;
+            ctx.fillStyle = 'rgba(0, 243, 255, 0.04)';
+            
+            // 1. Valve Cover
+            ctx.strokeRect(cx - 55, cy - 80, 110, 15);
+            ctx.fillRect(cx - 55, cy - 80, 110, 15);
+            
+            // 2. Cylinder Head
+            ctx.strokeRect(cx - 57, cy - 65, 114, 20);
+            ctx.fillRect(cx - 57, cy - 65, 114, 20);
+            
+            // Spark Plugs (draw lines)
+            ctx.strokeStyle = '#ffffff';
+            for (let i = -1.5; i <= 1.5; i += 1) {
+                const px = cx + i * 28;
+                ctx.beginPath();
+                ctx.moveTo(px, cy - 90);
+                ctx.lineTo(px, cy - 65);
+                ctx.stroke();
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(px - 3, cy - 92, 6, 8);
+            }
+            
+            // 3. Engine Block
+            ctx.strokeStyle = '#00f3ff';
+            ctx.fillStyle = 'rgba(0, 243, 255, 0.04)';
+            ctx.strokeRect(cx - 55, cy - 45, 110, 65);
+            ctx.fillRect(cx - 55, cy - 45, 110, 65);
+            
+            // Cylinder Bores (dashed)
+            ctx.strokeStyle = 'rgba(0, 243, 255, 0.35)';
+            ctx.setLineDash([4, 4]);
+            for (let i = -1.5; i <= 1.5; i += 1) {
+                const px = cx + i * 28;
+                ctx.beginPath();
+                ctx.moveTo(px, cy - 45);
+                ctx.lineTo(px, cy + 10);
+                ctx.stroke();
+            }
+            ctx.setLineDash([]);
+            
+            // Pistons and rods (white outline)
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1.5;
+            for (let i = -1.5; i <= 1.5; i += 1) {
+                const px = cx + i * 28;
+                const py = cy - 25 + Math.sin(i * Math.PI) * 8;
+                // Head
+                ctx.strokeRect(px - 9, py, 18, 9);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+                ctx.fillRect(px - 9, py, 18, 9);
+                // Rod
+                ctx.beginPath();
+                ctx.moveTo(px, py + 9);
+                ctx.lineTo(px, cy + 20);
+                ctx.stroke();
+            }
+            
+            // 4. Crankshaft
+            ctx.strokeStyle = '#00f3ff';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.moveTo(cx - 50, cy + 20);
+            ctx.lineTo(cx + 50, cy + 20);
+            ctx.stroke();
+            
+            // Crank Lobes
+            for (let i = -1.5; i <= 1.5; i += 1) {
+                const px = cx + i * 28;
+                const ly = cy + 20 + Math.sin(i * Math.PI) * 7;
+                ctx.beginPath();
+                ctx.moveTo(px - 5, cy + 20);
+                ctx.lineTo(px - 5, ly);
+                ctx.lineTo(px + 5, ly);
+                ctx.lineTo(px + 5, cy + 20);
+                ctx.stroke();
+            }
+            
+            // 5. Oil Pan
+            ctx.strokeStyle = '#00f3ff';
+            ctx.beginPath();
+            ctx.moveTo(cx - 55, cy + 20);
+            ctx.lineTo(cx - 45, cy + 38);
+            ctx.lineTo(cx + 45, cy + 38);
+            ctx.lineTo(cx + 55, cy + 20);
+            ctx.closePath();
+            ctx.stroke();
+            ctx.fillStyle = 'rgba(0, 243, 255, 0.04)';
+            ctx.fill();
+            
+            // Draw Labels
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.fillStyle = '#a0aec0';
+            ctx.font = 'bold 9px monospace';
+            ctx.lineWidth = 1;
+            
+            // Valve Cover Label
+            ctx.beginPath(); ctx.moveTo(cx - 45, cy - 72); ctx.lineTo(cx - 90, cy - 72); ctx.stroke();
+            ctx.fillText('VALVE COVER', cx - 160, cy - 69);
+            
+            // Spark Plugs Label
+            ctx.beginPath(); ctx.moveTo(cx - 14, cy - 83); ctx.lineTo(cx - 40, cy - 96); ctx.lineTo(cx - 90, cy - 96); ctx.stroke();
+            ctx.fillText('SPARK PLUGS', cx - 160, cy - 93);
+            
+            // Cylinder Head Label
+            ctx.beginPath(); ctx.moveTo(cx + 45, cy - 55); ctx.lineTo(cx + 85, cy - 55); ctx.stroke();
+            ctx.fillText('CYLINDER HEAD', cx + 90, cy - 52);
+            
+            // Engine Block Label
+            ctx.beginPath(); ctx.moveTo(cx - 45, cy - 10); ctx.lineTo(cx - 90, cy - 10); ctx.stroke();
+            ctx.fillText('ENGINE BLOCK', cx - 160, cy - 7);
+            
+            // Pistons Label
+            ctx.beginPath(); ctx.moveTo(cx + 30, cy - 20); ctx.lineTo(cx + 85, cy - 23); ctx.stroke();
+            ctx.fillText('PISTONS & RODS', cx + 90, cy - 20);
+            
+            // Crankshaft Label
+            ctx.beginPath(); ctx.moveTo(cx + 20, cy + 20); ctx.lineTo(cx + 85, cy + 12); ctx.stroke();
+            ctx.fillText('CRANKSHAFT', cx + 90, cy + 15);
+            
+            // Oil Pan Label
+            ctx.beginPath(); ctx.moveTo(cx - 35, cy + 33); ctx.lineTo(cx - 90, cy + 33); ctx.stroke();
+            ctx.fillText('OIL PAN', cx - 135, cy + 36);
+            
+            // Border Blueprint Frame
+            ctx.strokeStyle = '#00f3ff';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(10, 10, w - 20, h - 20);
+            
+            // Title Header
+            ctx.fillStyle = '#00f3ff';
+            ctx.font = 'bold 11px monospace';
+            ctx.fillText('ASSEMBLY BLUEPRINT - 4-CYLINDER ENGINE', 20, 28);
+        }
+
+        // Functions to transition from HTML Overlay to A-Frame
+        function startSimulation() {
+            synth.play('click');
+            const overlay = document.getElementById('startOverlay');
+            overlay.style.opacity = 0;
+            setTimeout(() => {
+                overlay.style.display = 'none';
+            }, 500);
+
+            // Notify Simulation Manager
+            const simManagerEl = document.querySelector('[simulation-manager]');
+            if (simManagerEl) {
+                simManagerEl.components['simulation-manager'].startWorkshop();
+            }
+        }
+
+        function restartSimulation() {
+            synth.play('click');
+            const compOverlay = document.getElementById('completionOverlay');
+            compOverlay.style.display = 'none';
+            
+            const startOverlay = document.getElementById('startOverlay');
+            startOverlay.style.display = 'none';
+
+            const simManagerEl = document.querySelector('[simulation-manager]');
+            if (simManagerEl) {
+                simManagerEl.components['simulation-manager'].resetSimulation();
+            }
+        }
+
+        function exitApp() {
+            synth.play('click');
+            const sceneEl = document.querySelector('a-scene');
+            if (sceneEl && sceneEl.is('vr-mode')) {
+                sceneEl.exitVR();
+            }
+            // Return back to start menu view
+            document.getElementById('completionOverlay').style.display = 'none';
+            const overlay = document.getElementById('startOverlay');
+            overlay.style.display = 'flex';
+            overlay.style.opacity = 1;
+            
+            const simManagerEl = document.querySelector('[simulation-manager]');
+            if (simManagerEl) {
+                simManagerEl.components['simulation-manager'].exitToMenu();
+            }
+        }
+    </script>
+
+    <a-scene shadow="type: pcfsoft" renderer="antialias: true; colorManagement: true">
+        <!-- Asset Management System -->
+        <a-assets>
+            <canvas id="blueprintCanvas" width="512" height="512"></canvas>
+            
+            <!-- Materials for dynamic outline effect -->
+            <a-material id="workbenchMat" color="#181e29" metalness="0.8" roughness="0.2"></a-material>
+            <a-material id="shelfMat" color="#0c0f18" metalness="0.5" roughness="0.6"></a-material>
+            <a-material id="pistonMetal" color="#a0aec0" metalness="0.9" roughness="0.1" emissive="#101520"></a-material>
+            <a-material id="steelMetal" color="#4a5568" metalness="0.85" roughness="0.25"></a-material>
+            <a-material id="valveCoverMat" color="#e53e3e" metalness="0.4" roughness="0.3"></a-material>
+        </a-assets>
+
+        <!-- Dynamic canvas drawing triggers -->
+        <script>
+            document.addEventListener('DOMContentLoaded', () => {
+                const canvas = document.getElementById('blueprintCanvas');
+                if (canvas) drawEngineBlueprint(canvas);
+            });
+        </script>
+
+        <!-- Floor Grid and Space Design -->
+        <!-- Navy Blueprint Grid Floor -->
+        <a-entity id="customFloor" geometry="primitive: plane; width: 100; height: 100" rotation="-90 0 0"
+                  material="color: #0b0f1d; roughness: 0.9; metalness: 0.1; repeat: 100 100; shader: standard"></a-entity>
+        
+        <!-- Floor grid stripes overlay -->
+        <a-grid width="50" height="50" color="#00f3ff" opacity="0.1" position="0 0.01 0"></a-grid>
+
+        <!-- Cyberpunk Garage Walls and Decor -->
+        <!-- Back Wall Decor -->
+        <a-plane position="0 3 -4.5" width="10" height="6" color="#050812" metalness="0.4" roughness="0.8"></a-plane>
+        <a-entity line="start: -5 1.5 -4.4; end: 5 1.5 -4.4; color: #ff00a0; opacity: 0.6"></a-entity>
+        <a-entity line="start: -5 3 -4.4; end: 5 3 -4.4; color: #00f3ff; opacity: 0.6"></a-entity>
+        <a-entity line="start: -5 4.5 -4.4; end: 5 4.5 -4.4; color: #ff00a0; opacity: 0.6"></a-entity>
+        
+        <!-- Side columns with glowing red/pink strips -->
+        <a-cylinder position="-3.5 2 -4.0" radius="0.1" height="4" color="#ff00a0" material="emissive: #ff00a0; emissiveIntensity: 1.5; shader: flat"></a-cylinder>
+        <a-cylinder position="3.5 2 -4.0" radius="0.1" height="4" color="#00f3ff" material="emissive: #00f3ff; emissiveIntensity: 1.5; shader: flat"></a-cylinder>
+
+        <!-- Ambient and Directional Lights -->
+        <a-entity light="type: ambient; color: #151c38; intensity: 0.8"></a-entity>
+        <a-entity light="type: directional; color: #ffffff; intensity: 0.9; castShadow: true; shadowMapHeight: 1024; shadowMapWidth: 1024; shadowCameraLeft: -2; shadowCameraRight: 2; shadowCameraTop: 2; shadowCameraBottom: -2; shadowBias: -0.0005" position="1.5 4 -0.5"></a-entity>
+        <a-entity light="type: spot; color: #00f3ff; intensity: 1.2; angle: 45; penumbra: 0.5" position="0 3.5 -1.2" target="#workbench"></a-entity>
+
+        <!-- Player Rig / Camera Setup -->
+        <a-entity id="rig" position="0 0 0">
+            <a-camera id="camera" look-controls="pointerLockEnabled: false" wasd-controls="acceleration: 15" position="0 1.6 0">
+                <!-- Desktop Cursor -->
+                <a-cursor id="desktopCursor"
+                          raycaster="objects: .interactive, .grabbable; far: 4"
+                          material="color: #00f3ff; shader: flat; opacity: 0.8"
+                          geometry="primitive: ring; radiusInner: 0.006; radiusOuter: 0.011"
+                          visible="true">
+                </a-cursor>
+            </a-camera>
+
+            <!-- VR Gloved Controller Hands with Laser pointer rays -->
+            <a-entity id="leftController" hand-controls="hand: left; handModelStyle: lowPoly; color: #1b264f"
+                      raycaster="objects: .interactive, .grabbable; far: 3; interval: 100; showLine: true"
+                      line="color: #00f3ff; opacity: 0.8"
+                      vr-controller-grabber>
+            </a-entity>
+            
+            <a-entity id="rightController" hand-controls="hand: right; handModelStyle: lowPoly; color: #1b264f"
+                      raycaster="objects: .interactive, .grabbable; far: 3; interval: 100; showLine: true"
+                      line="color: #00f3ff; opacity: 0.8"
+                      vr-controller-grabber>
+            </a-entity>
+        </a-entity>
+
+        <!-- The Workbench / Table Setup -->
+        <a-entity id="workbench" position="0 0.9 -1.2">
+            <!-- Table top -->
+            <a-box class="workbench-surface" width="1.8" height="0.05" depth="1.0" material="src: #workbenchMat; metalness: 0.85; roughness: 0.25" shadow="receive: true"></a-box>
+            <!-- Assembly Plate / Circle -->
+            <a-cylinder id="assemblyPlate" position="0 0.026 0" radius="0.32" height="0.005" color="#00f3ff" material="opacity: 0.3; transparent: true; emissive: #00f3ff; emissiveIntensity: 0.5; shader: flat"></a-cylinder>
+            <a-ring position="0 0.027 0" rotation="-90 0 0" radius-inner="0.31" radius-outer="0.32" color="#00f3ff" material="shader: flat"></a-ring>
+            
+            <!-- Table Legs -->
+            <a-cylinder position="-0.85 -0.45 0.45" radius="0.03" height="0.9" color="#0a0e1a" metalness="0.9" shadow="cast: true"></a-cylinder>
+            <a-cylinder position="0.85 -0.45 0.45" radius="0.03" height="0.9" color="#0a0e1a" metalness="0.9" shadow="cast: true"></a-cylinder>
+            <a-cylinder position="-0.85 -0.45 -0.45" radius="0.03" height="0.9" color="#0a0e1a" metalness="0.9" shadow="cast: true"></a-cylinder>
+            <a-cylinder position="0.85 -0.45 -0.45" radius="0.03" height="0.9" color="#0a0e1a" metalness="0.9" shadow="cast: true"></a-cylinder>
+            
+            <!-- Bottom Storage Shelf -->
+            <a-box width="1.7" height="0.02" depth="0.8" position="0 -0.45 0" material="src: #shelfMat; metalness: 0.6; roughness: 0.5" shadow="receive: true"></a-box>
+        </a-entity>
+
+        <!-- Central Engine Assembly Group (Rotates when complete) -->
+        <a-entity id="engineGroup" position="0 0 -1.2">
+            <!-- Ghost outlines target parent -->
+            <a-entity id="ghostContainer"></a-entity>
+            
+            <!-- Snapped Parts will be registered here, starting as components spread on table -->
+            
+            <!-- 1. Engine Block -->
+            <a-entity id="engine-block" grabbable position="-0.6 0.95 0.2">
+                <!-- Main Block Base -->
+                <a-box width="0.55" height="0.36" depth="0.3" color="#4a5568" metalness="0.75" roughness="0.3" shadow="cast: true; receive: true"></a-box>
+                <!-- Crank Journal base -->
+                <a-box position="0 -0.19 0" width="0.48" height="0.04" depth="0.26" color="#2d3748" metalness="0.8"></a-box>
+                <!-- Cylinders Top Deck -->
+                <a-box position="0 0.185 0" width="0.56" height="0.02" depth="0.31" color="#1a202c" metalness="0.85"></a-box>
+                <!-- Cylinder cutout holes inside deck -->
+                <a-cylinder position="-0.21 0.19 0" radius="0.052" height="0.01" color="#05080f" segments-radial="16"></a-cylinder>
+                <a-cylinder position="-0.07 0.19 0" radius="0.052" height="0.01" color="#05080f" segments-radial="16"></a-cylinder>
+                <a-cylinder position="0.07 0.19 0" radius="0.052" height="0.01" color="#05080f" segments-radial="16"></a-cylinder>
+                <a-cylinder position="0.21 0.19 0" radius="0.052" height="0.01" color="#05080f" segments-radial="16"></a-cylinder>
+                <!-- Blue Oil Filter detail -->
+                <a-cylinder position="0.14 -0.06 0.155" rotation="90 0 0" radius="0.032" height="0.06" color="#0055ff" metalness="0.6" shadow="cast: true"></a-cylinder>
+            </a-entity>
+
+            <!-- 2. Crankshaft -->
+            <a-entity id="crankshaft" grabbable position="0.6 0.95 0.2" rotation="0 0 90">
+                <!-- Central Rod Shaft -->
+                <a-cylinder radius="0.016" height="0.5" color="#cbd5e0" metalness="0.95" roughness="0.1" rotation="0 0 90" shadow="cast: true"></a-cylinder>
+                
+                <!-- Web Pair 1 (Left Cyl) -->
+                <a-box position="-0.21 0.035 0" width="0.02" height="0.08" depth="0.04" color="#4a5568" metalness="0.9" shadow="cast: true"></a-box>
+                <a-box position="-0.21 -0.035 0" width="0.02" height="0.08" depth="0.04" color="#4a5568" metalness="0.9" shadow="cast: true"></a-box>
+                <a-cylinder position="-0.21 0.04 0" radius="0.016" height="0.04" color="#e2e8f0" metalness="0.95" rotation="0 0 90" shadow="cast: true"></a-cylinder>
+                
+                <!-- Web Pair 2 -->
+                <a-box position="-0.07 -0.035 0" width="0.02" height="0.08" depth="0.04" color="#4a5568" metalness="0.9" shadow="cast: true"></a-box>
+                <a-box position="-0.07 0.035 0" width="0.02" height="0.08" depth="0.04" color="#4a5568" metalness="0.9" shadow="cast: true"></a-box>
+                <a-cylinder position="-0.07 -0.04 0" radius="0.016" height="0.04" color="#e2e8f0" metalness="0.95" rotation="0 0 90" shadow="cast: true"></a-cylinder>
+                
+                <!-- Web Pair 3 -->
+                <a-box position="0.07 -0.035 0" width="0.02" height="0.08" depth="0.04" color="#4a5568" metalness="0.9" shadow="cast: true"></a-box>
+                <a-box position="0.07 0.035 0" width="0.02" height="0.08" depth="0.04" color="#4a5568" metalness="0.9" shadow="cast: true"></a-box>
+                <a-cylinder position="0.07 -0.04 0" radius="0.016" height="0.04" color="#e2e8f0" metalness="0.95" rotation="0 0 90" shadow="cast: true"></a-cylinder>
+                
+                <!-- Web Pair 4 (Right Cyl) -->
+                <a-box position="0.21 0.035 0" width="0.02" height="0.08" depth="0.04" color="#4a5568" metalness="0.9" shadow="cast: true"></a-box>
+                <a-box position="0.21 -0.035 0" width="0.02" height="0.08" depth="0.04" color="#4a5568" metalness="0.9" shadow="cast: true"></a-box>
+                <a-cylinder position="0.21 0.04 0" radius="0.016" height="0.04" color="#e2e8f0" metalness="0.95" rotation="0 0 90" shadow="cast: true"></a-cylinder>
+            </a-entity>
+
+            <!-- 3. Pistons (4 Separate assemblies) -->
+            <a-entity id="piston-1" grabbable position="-0.5 0.95 0.4">
+                <!-- Piston Crown -->
+                <a-cylinder position="0 0.08 0" radius="0.05" height="0.06" color="#cbd5e0" metalness="0.9" roughness="0.1" shadow="cast: true"></a-cylinder>
+                <!-- Connecting Rod -->
+                <a-box position="0 -0.04 0" width="0.012" height="0.16" depth="0.016" color="#718096" metalness="0.8" shadow="cast: true"></a-box>
+                <!-- Connecting Rod Bottom Cap -->
+                <a-torus position="0 -0.12 0" radius="0.02" radius-tubular="0.005" rotation="0 90 0" color="#a0aec0" metalness="0.9" shadow="cast: true"></a-torus>
+            </a-entity>
+
+            <a-entity id="piston-2" grabbable position="-0.3 0.95 0.4">
+                <a-cylinder position="0 0.08 0" radius="0.05" height="0.06" color="#cbd5e0" metalness="0.9" roughness="0.1" shadow="cast: true"></a-cylinder>
+                <a-box position="0 -0.04 0" width="0.012" height="0.16" depth="0.016" color="#718096" metalness="0.8" shadow="cast: true"></a-box>
+                <a-torus position="0 -0.12 0" radius="0.02" radius-tubular="0.005" rotation="0 90 0" color="#a0aec0" metalness="0.9" shadow="cast: true"></a-torus>
+            </a-entity>
+
+            <a-entity id="piston-3" grabbable position="0.3 0.95 0.4">
+                <a-cylinder position="0 0.08 0" radius="0.05" height="0.06" color="#cbd5e0" metalness="0.9" roughness="0.1" shadow="cast: true"></a-cylinder>
+                <a-box position="0 -0.04 0" width="0.012" height="0.16" depth="0.016" color="#718096" metalness="0.8" shadow="cast: true"></a-box>
+                <a-torus position="0 -0.12 0" radius="0.02" radius-tubular="0.005" rotation="0 90 0" color="#a0aec0" metalness="0.9" shadow="cast: true"></a-torus>
+            </a-entity>
+
+            <a-entity id="piston-4" grabbable position="0.5 0.95 0.4">
+                <a-cylinder position="0 0.08 0" radius="0.05" height="0.06" color="#cbd5e0" metalness="0.9" roughness="0.1" shadow="cast: true"></a-cylinder>
+                <a-box position="0 -0.04 0" width="0.012" height="0.16" depth="0.016" color="#718096" metalness="0.8" shadow="cast: true"></a-box>
+                <a-torus position="0 -0.12 0" radius="0.02" radius-tubular="0.005" rotation="0 90 0" color="#a0aec0" metalness="0.9" shadow="cast: true"></a-torus>
+            </a-entity>
+
+            <!-- 4. Cylinder Head -->
+            <a-entity id="cylinder-head" grabbable position="-0.4 0.95 -0.2">
+                <!-- Main Block Box -->
+                <a-box width="0.56" height="0.09" depth="0.31" color="#2d3748" metalness="0.8" roughness="0.25" shadow="cast: true; receive: true"></a-box>
+                <!-- 4 Spark plug well cutouts on top -->
+                <a-cylinder position="-0.21 0.046 0" radius="0.015" height="0.01" color="#1a202c"></a-cylinder>
+                <a-cylinder position="-0.07 0.046 0" radius="0.015" height="0.01" color="#1a202c"></a-cylinder>
+                <a-cylinder position="0.07 0.046 0" radius="0.015" height="0.01" color="#1a202c"></a-cylinder>
+                <a-cylinder position="0.21 0.046 0" radius="0.015" height="0.01" color="#1a202c"></a-cylinder>
+                <!-- Exhaust/Intake manifold flange connectors (side plates) -->
+                <a-box position="0 0 0.155" width="0.5" height="0.05" depth="0.01" color="#1a202c"></a-box>
+                <a-box position="0 0 -0.155" width="0.5" height="0.05" depth="0.01" color="#1a202c"></a-box>
+            </a-entity>
+
+            <!-- 5. Spark Plugs (4 separate) -->
+            <a-entity id="spark-plug-1" grabbable position="-0.2 0.95 0.6">
+                <a-cylinder position="0 -0.03 0" radius="0.008" height="0.03" color="#4a5568" metalness="0.9"></a-cylinder>
+                <a-cylinder position="0 -0.01 0" segments-radial="6" radius="0.013" height="0.01" color="#718096" metalness="0.9"></a-cylinder>
+                <a-cylinder position="0 0.02 0" radius="0.009" height="0.05" color="#ffffff" roughness="0.9"></a-cylinder>
+                <a-cylinder position="0 0.048 0" radius="0.004" height="0.006" color="#ecc94b" metalness="0.95"></a-cylinder>
+            </a-entity>
+
+            <a-entity id="spark-plug-2" grabbable position="-0.1 0.95 0.6">
+                <a-cylinder position="0 -0.03 0" radius="0.008" height="0.03" color="#4a5568" metalness="0.9"></a-cylinder>
+                <a-cylinder position="0 -0.01 0" segments-radial="6" radius="0.013" height="0.01" color="#718096" metalness="0.9"></a-cylinder>
+                <a-cylinder position="0 0.02 0" radius="0.009" height="0.05" color="#ffffff" roughness="0.9"></a-cylinder>
+                <a-cylinder position="0 0.048 0" radius="0.004" height="0.006" color="#ecc94b" metalness="0.95"></a-cylinder>
+            </a-entity>
+
+            <a-entity id="spark-plug-3" grabbable position="0.1 0.95 0.6">
+                <a-cylinder position="0 -0.03 0" radius="0.008" height="0.03" color="#4a5568" metalness="0.9"></a-cylinder>
+                <a-cylinder position="0 -0.01 0" segments-radial="6" radius="0.013" height="0.01" color="#718096" metalness="0.9"></a-cylinder>
+                <a-cylinder position="0 0.02 0" radius="0.009" height="0.05" color="#ffffff" roughness="0.9"></a-cylinder>
+                <a-cylinder position="0 0.048 0" radius="0.004" height="0.006" color="#ecc94b" metalness="0.95"></a-cylinder>
+            </a-entity>
+
+            <a-entity id="spark-plug-4" grabbable position="0.2 0.95 0.6">
+                <a-cylinder position="0 -0.03 0" radius="0.008" height="0.03" color="#4a5568" metalness="0.9"></a-cylinder>
+                <a-cylinder position="0 -0.01 0" segments-radial="6" radius="0.013" height="0.01" color="#718096" metalness="0.9"></a-cylinder>
+                <a-cylinder position="0 0.02 0" radius="0.009" height="0.05" color="#ffffff" roughness="0.9"></a-cylinder>
+                <a-cylinder position="0 0.048 0" radius="0.004" height="0.006" color="#ecc94b" metalness="0.95"></a-cylinder>
+            </a-entity>
+
+            <!-- 6. Valve Cover -->
+            <a-entity id="valve-cover" grabbable position="0.4 0.95 -0.2">
+                <!-- Cover box -->
+                <a-box width="0.54" height="0.06" depth="0.29" color="#e53e3e" metalness="0.4" roughness="0.4" shadow="cast: true"></a-box>
+                <!-- Upper crown rib -->
+                <a-box position="0 0.035 0" width="0.5" height="0.015" depth="0.25" color="#c53030"></a-box>
+                <!-- Gold oil filler cap -->
+                <a-cylinder position="0.18 0.045 0.06" radius="0.018" height="0.015" color="#ecc94b" metalness="0.6" shadow="cast: true"></a-cylinder>
+                <!-- Chromium highlights -->
+                <a-box position="0 0.036 0.04" width="0.38" height="0.008" depth="0.008" color="#cbd5e0" metalness="0.9"></a-box>
+                <a-box position="0 0.036 -0.04" width="0.38" height="0.008" depth="0.008" color="#cbd5e0" metalness="0.9"></a-box>
+            </a-entity>
+
+            <!-- 7. Intake Manifold -->
+            <a-entity id="intake-manifold" grabbable position="-0.6 0.95 0.6">
+                <!-- Horizontal main collection box -->
+                <a-cylinder position="0 0.04 0.04" rotation="0 0 90" radius="0.03" height="0.5" color="#2d3748" metalness="0.7" shadow="cast: true"></a-cylinder>
+                <!-- Intake throttle body tube -->
+                <a-cylinder position="-0.26 0.04 0.04" rotation="0 90 0" radius="0.036" height="0.08" color="#1a202c" metalness="0.8" shadow="cast: true"></a-cylinder>
+                <!-- 4 intake runners (curved connecting pipes) -->
+                <a-cylinder position="-0.21 0.0 -0.015" rotation="30 0 0" radius="0.013" height="0.09" color="#4a5568" metalness="0.6" shadow="cast: true"></a-cylinder>
+                <a-cylinder position="-0.07 0.0 -0.015" rotation="30 0 0" radius="0.013" height="0.09" color="#4a5568" metalness="0.6" shadow="cast: true"></a-cylinder>
+                <a-cylinder position="0.07 0.0 -0.015" rotation="30 0 0" radius="0.013" height="0.09" color="#4a5568" metalness="0.6" shadow="cast: true"></a-cylinder>
+                <a-cylinder position="0.21 0.0 -0.015" rotation="30 0 0" radius="0.013" height="0.09" color="#4a5568" metalness="0.6" shadow="cast: true"></a-cylinder>
+            </a-entity>
+
+            <!-- 8. Exhaust Manifold -->
+            <a-entity id="exhaust-manifold" grabbable position="0.6 0.95 0.6">
+                <!-- 4 copper/rust colored runner tubes -->
+                <a-cylinder position="-0.21 0.0 0.015" rotation="-30 0 0" radius="0.012" height="0.09" color="#b7791f" metalness="0.8" roughness="0.5" shadow="cast: true"></a-cylinder>
+                <a-cylinder position="-0.07 0.0 0.015" rotation="-30 0 0" radius="0.012" height="0.09" color="#b7791f" metalness="0.8" roughness="0.5" shadow="cast: true"></a-cylinder>
+                <a-cylinder position="0.07 0.0 0.015" rotation="-30 0 0" radius="0.012" height="0.09" color="#b7791f" metalness="0.8" roughness="0.5" shadow="cast: true"></a-cylinder>
+                <a-cylinder position="0.21 0.0 0.015" rotation="-30 0 0" radius="0.012" height="0.09" color="#b7791f" metalness="0.8" roughness="0.5" shadow="cast: true"></a-cylinder>
+                <!-- Exhaust gather collector pipe -->
+                <a-cylinder position="0 -0.035 -0.04" rotation="0 0 90" radius="0.022" height="0.5" color="#4a5568" metalness="0.8" shadow="cast: true"></a-cylinder>
+                <!-- Exhaust outlet downpipe -->
+                <a-cylinder position="0.2 -0.09 -0.06" rotation="45 -45 0" radius="0.026" height="0.12" color="#2d3748" metalness="0.8" shadow="cast: true"></a-cylinder>
+            </a-entity>
+
+            <!-- 9. Oil Pan -->
+            <a-entity id="oil-pan" grabbable position="0 0.4 -0.4">
+                <!-- Pan Box -->
+                <a-box width="0.53" height="0.09" depth="0.27" color="#1a202c" metalness="0.6" roughness="0.5" shadow="cast: true; receive: true"></a-box>
+                <!-- Upper snap flange -->
+                <a-box position="0 0.046 0" width="0.55" height="0.015" depth="0.29" color="#2d3748" metalness="0.7"></a-box>
+                <!-- Gold oil drain bolt -->
+                <a-cylinder position="0.18 -0.042 -0.07" rotation="90 0 0" radius="0.007" height="0.012" color="#ecc94b" metalness="0.9"></a-cylinder>
+            </a-entity>
+        </a-entity>
+
+        <!-- Floating Glassmorphic Instruction Panel -->
+        <!-- Center-positioned board slightly tilted up, readable inside VR and Desktop -->
+        <a-entity id="hudBoard" position="0 1.8 -2.0" rotation="10 0 0" simulation-manager>
+            <!-- Semi-transparent glass background plate -->
+            <a-plane width="1.6" height="1.0" color="#050a18" material="opacity: 0.85; transparent: true; metalness: 0.8; roughness: 0.1; emissive: #071026" shadow="receive: true"></a-plane>
+            <!-- Glowing Panel Border -->
+            <a-box position="0 0.5 0.005" width="1.62" height="0.015" depth="0.01" color="#00f3ff" material="shader: flat"></a-box>
+            <a-box position="0 -0.5 0.005" width="1.62" height="0.015" depth="0.01" color="#00f3ff" material="shader: flat"></a-box>
+            <a-box position="-0.81 0 0.005" width="0.015" height="1.0" depth="0.01" color="#00f3ff" material="shader: flat"></a-box>
+            <a-box position="0.81 0 0.005" width="0.015" height="1.0" depth="0.01" color="#00f3ff" material="shader: flat"></a-box>
+            
+            <!-- Left Side Pane: Step instructions, Progress, Controls -->
+            <a-entity position="-0.38 0 0">
+                <!-- Title Header -->
+                <a-text id="stepNumber" value="START SCREEN" position="-0.36 0.38 0.01" color="#ff00a0" font="monoid" width="2.4" bold="true"></a-text>
+                <a-text id="stepName" value="Engine Assembly" position="-0.36 0.28 0.01" color="#00f3ff" font="monoid" width="2.6" bold="true"></a-text>
+                
+                <!-- Main description wrap instructions -->
+                <a-text id="stepDesc" value="Press Start Simulation below or in the HTML overlay to enter the workshop." 
+                        position="-0.36 0.08 0.01" color="#ffffff" font="monoid" width="1.9" wrap-count="30"></a-text>
+                
+                <!-- Feedback success label -->
+                <a-text id="feedbackText" value="" position="-0.36 -0.12 0.01" color="#ff00a0" font="monoid" width="2.2" bold="true" opacity="0"></a-text>
+                
+                <!-- Progress counters -->
+                <a-text id="progressText" value="Progress: 0 / 15 steps (0%)" position="-0.36 -0.22 0.01" color="#8b9bb4" font="monoid" width="1.7"></a-text>
+                
+                <!-- Progress Bar visual -->
+                <a-box id="progressBg" position="0 -0.29 0.01" width="0.72" height="0.02" depth="0.005" color="#1a202c"></a-box>
+                <a-box id="progressBar" position="-0.36 -0.29 0.012" width="0.001" height="0.02" depth="0.005" color="#00f3ff" material="shader: flat" pivot="-0.5 0 0"></a-box>
+                
+                <!-- Action 3D buttons (Clickable in VR & Desktop) -->
+                <!-- Start Button (visible at start menu) -->
+                <a-entity id="btnStart3D" interactive-button="text: START GAME; action: start; width: 0.45; height: 0.12" position="0 -0.39 0.02"></a-entity>
+                
+                <!-- Active Gameplay control buttons (hidden at start, shown in workshop) -->
+                <a-entity id="btnRestart3D" interactive-button="text: RESTART; action: restart; width: 0.32; height: 0.1" position="-0.2 -0.39 0.02" visible="false"></a-entity>
+                <a-entity id="btnExit3D" interactive-button="text: EXIT; action: exit; width: 0.32; height: 0.1" position="0.2 -0.39 0.02" visible="false"></a-entity>
+            </a-entity>
+            
+            <!-- Right Side Pane: Interactive 2D Blueprint Schematic -->
+            <a-entity position="0.38 0 0">
+                <!-- Flat screen display rendering canvas -->
+                <a-plane id="blueprintPlane" material="src: #blueprintCanvas; transparent: true; opacity: 0.95; shader: flat" width="0.72" height="0.72" position="0 0 0.01"></a-plane>
+            </a-entity>
+        </a-entity>
     </a-scene>
+
+    <!-- Custom component registrations script -->
+    <script>
+        // Configurable list of assembly steps matching design plan
+        const STEPS = [
+            { id: 'engine-block', name: 'Engine Block', targetPos: {x: 0, y: 0.95, z: 0}, targetRot: {x: 0, y: 0, z: 0}, instructions: 'Grab the Engine Block and place it onto the glowing circle on the assembly workbench.' },
+            { id: 'crankshaft', name: 'Crankshaft', targetPos: {x: 0, y: 0.82, z: 0}, targetRot: {x: 0, y: 0, z: 90}, instructions: 'Insert the Crankshaft horizontally into the lower bearing journals of the Engine Block.' },
+            { id: 'piston-1', name: 'Piston 1', targetPos: {x: -0.21, y: 1.05, z: 0}, targetRot: {x: 0, y: 0, z: 0}, instructions: 'Insert Piston 1 into the leftmost cylinder bore (Cylinder 1) from the top.' },
+            { id: 'piston-2', name: 'Piston 2', targetPos: {x: -0.07, y: 1.05, z: 0}, targetRot: {x: 0, y: 0, z: 0}, instructions: 'Insert Piston 2 into the second cylinder bore (Cylinder 2) from the top.' },
+            { id: 'piston-3', name: 'Piston 3', targetPos: {x: 0.07, y: 1.05, z: 0}, targetRot: {x: 0, y: 0, z: 0}, instructions: 'Insert Piston 3 into the third cylinder bore (Cylinder 3) from the top.' },
+            { id: 'piston-4', name: 'Piston 4', targetPos: {x: 0.21, y: 1.05, z: 0}, targetRot: {x: 0, y: 0, z: 0}, instructions: 'Insert Piston 4 into the rightmost cylinder bore (Cylinder 4) from the top.' },
+            { id: 'cylinder-head', name: 'Cylinder Head', targetPos: {x: 0, y: 1.22, z: 0}, targetRot: {x: 0, y: 0, z: 0}, instructions: 'Sit the heavy dark metal Cylinder Head flat on top of the Engine Block deck.' },
+            { id: 'spark-plug-1', name: 'Spark Plug 1', targetPos: {x: -0.21, y: 1.32, z: 0}, targetRot: {x: 0, y: 0, z: 0}, instructions: 'Screw Spark Plug 1 into the leftmost spark plug well of the Cylinder Head.' },
+            { id: 'spark-plug-2', name: 'Spark Plug 2', targetPos: {x: -0.07, y: 1.32, z: 0}, targetRot: {x: 0, y: 0, z: 0}, instructions: 'Screw Spark Plug 2 into the second spark plug well of the Cylinder Head.' },
+            { id: 'spark-plug-3', name: 'Spark Plug 3', targetPos: {x: 0.07, y: 1.32, z: 0}, targetRot: {x: 0, y: 0, z: 0}, instructions: 'Screw Spark Plug 3 into the third spark plug well of the Cylinder Head.' },
+            { id: 'spark-plug-4', name: 'Spark Plug 4', targetPos: {x: 0.21, y: 1.32, z: 0}, targetRot: {x: 0, y: 0, z: 0}, instructions: 'Screw Spark Plug 4 into the rightmost spark plug well of the Cylinder Head.' },
+            { id: 'valve-cover', name: 'Valve Cover', targetPos: {x: 0, y: 1.35, z: 0}, targetRot: {x: 0, y: 0, z: 0}, instructions: 'Snap the red Valve Cover onto the top of the Cylinder Head to protect the valvetrain.' },
+            { id: 'intake-manifold', name: 'Intake Manifold', targetPos: {x: 0, y: 1.23, z: 0.22}, targetRot: {x: 0, y: 0, z: 0}, instructions: 'Attach the dark Intake Manifold to the front side of the Cylinder Head.' },
+            { id: 'exhaust-manifold', name: 'Exhaust Manifold', targetPos: {x: 0, y: 1.23, z: -0.22}, targetRot: {x: 0, y: 0, z: 0}, instructions: 'Attach the metallic Exhaust Manifold to the back side of the Cylinder Head.' },
+            { id: 'oil-pan', name: 'Oil Pan', targetPos: {x: 0, y: 0.66, z: 0}, targetRot: {x: 0, y: 0, z: 0}, instructions: 'Seal the assembly by attaching the dark steel Oil Pan to the bottom of the block.' }
+        ];
+
+        // Central Simulation State Manager component
+        AFRAME.registerComponent('simulation-manager', {
+            init: function () {
+                this.state = 'START_MENU'; // START_MENU, TUTORIAL, COMPLETED
+                this.stepIndex = 0;
+                this.ghostEl = null;
+
+                // Elements cached
+                this.stepNumberEl = document.getElementById('stepNumber');
+                this.stepNameEl = document.getElementById('stepName');
+                this.stepDescEl = document.getElementById('stepDesc');
+                this.progressTextEl = document.getElementById('progressText');
+                this.progressBarEl = document.getElementById('progressBar');
+                this.feedbackTextEl = document.getElementById('feedbackText');
+                this.ghostContainer = document.getElementById('ghostContainer');
+
+                this.btnStart3D = document.getElementById('btnStart3D');
+                this.btnRestart3D = document.getElementById('btnRestart3D');
+                this.btnExit3D = document.getElementById('btnExit3D');
+
+                // Bind scenes VR entering events to toggle desktop cursor HUD
+                this.el.sceneEl.addEventListener('enter-vr', () => {
+                    const cursor = document.getElementById('desktopCursor');
+                    if (cursor) cursor.setAttribute('visible', 'false');
+                    const hud = document.getElementById('desktopHud');
+                    if (hud) hud.style.display = 'none';
+                });
+                
+                this.el.sceneEl.addEventListener('exit-vr', () => {
+                    const cursor = document.getElementById('desktopCursor');
+                    if (cursor) cursor.setAttribute('visible', 'true');
+                    const hud = document.getElementById('desktopHud');
+                    if (hud) hud.style.display = 'flex';
+                    
+                    // Show corresponding screen overlays
+                    if (this.state === 'START_MENU') {
+                        document.getElementById('startOverlay').style.display = 'flex';
+                        document.getElementById('startOverlay').style.opacity = 1;
+                    } else if (this.state === 'COMPLETED') {
+                        document.getElementById('completionOverlay').style.display = 'flex';
+                    }
+                });
+
+                // Lock parts initially
+                this.lockAllParts();
+            },
+
+            playSound: function (type) {
+                synth.play(type);
+            },
+
+            lockAllParts: function () {
+                STEPS.forEach(s => {
+                    const el = document.getElementById(s.id);
+                    if (el) {
+                        el.setAttribute('material', 'opacity', 0.55);
+                        el.setAttribute('material', 'transparent', true);
+                    }
+                });
+            },
+
+            startWorkshop: function () {
+                this.state = 'TUTORIAL';
+                this.stepIndex = 0;
+                
+                // Show game buttons, hide start button
+                this.btnStart3D.setAttribute('visible', 'false');
+                this.btnRestart3D.setAttribute('visible', 'true');
+                this.btnExit3D.setAttribute('visible', 'true');
+                
+                this.btnStart3D.classList.remove('interactive');
+                this.btnRestart3D.classList.add('interactive');
+                this.btnExit3D.classList.add('interactive');
+
+                // Stop any previous rotation
+                const engineGroup = document.getElementById('engineGroup');
+                engineGroup.removeAttribute('animation');
+                engineGroup.setAttribute('rotation', '0 0 0');
+
+                this.loadStep(0);
+            },
+
+            isPartActive: function (partId) {
+                if (this.state !== 'TUTORIAL') return false;
+                return STEPS[this.stepIndex].id === partId;
+            },
+
+            loadStep: function (index) {
+                this.stepIndex = index;
+                const step = STEPS[index];
+                
+                // Update 3D floating panel texts
+                this.stepNumberEl.setAttribute('value', `STEP ${index + 1} / ${STEPS.length}`);
+                this.stepNameEl.setAttribute('value', step.name.toUpperCase());
+                this.stepDescEl.setAttribute('value', step.instructions);
+                
+                // Update Progress metrics
+                const pct = Math.round((index / STEPS.length) * 100);
+                this.progressTextEl.setAttribute('value', `Progress: ${index} / ${STEPS.length} steps (${pct}%)`);
+                this.progressBarEl.setAttribute('width', Math.max(0.001, 0.72 * (index / STEPS.length)));
+
+                // Highlight active part, translucent state to others
+                STEPS.forEach((s, idx) => {
+                    const el = document.getElementById(s.id);
+                    if (el) {
+                        if (idx === index) {
+                            // Active part glow and solid color
+                            el.setAttribute('material', 'opacity', 1.0);
+                            el.setAttribute('material', 'transparent', false);
+                            el.setAttribute('material', 'emissive', '#152535');
+                        } else if (idx > index) {
+                            // Locked future parts
+                            el.setAttribute('material', 'opacity', 0.4);
+                            el.setAttribute('material', 'transparent', true);
+                            el.setAttribute('material', 'emissive', '#000000');
+                        }
+                    }
+                });
+
+                // Spawn neon transparent ghost target outline
+                this.spawnGhostTarget(step);
+            },
+
+            spawnGhostTarget: function (step) {
+                // Clear old ghost
+                if (this.ghostEl) {
+                    this.ghostContainer.removeChild(this.ghostEl);
+                    this.ghostEl = null;
+                }
+
+                // Get original part element reference
+                const originalPart = document.getElementById(step.id);
+                if (!originalPart) return;
+
+                // Clone target and setup transparent glow shaders
+                const ghost = originalPart.cloneNode(true);
+                ghost.removeAttribute('id');
+                ghost.removeAttribute('grabbable');
+                ghost.setAttribute('class', 'ghost-target');
+                ghost.setAttribute('position', step.targetPos);
+                ghost.setAttribute('rotation', step.targetRot);
+
+                // Deep color changes to neon cyan
+                const colorize = (el) => {
+                    if (el.tagName === 'A-BOX' || el.tagName === 'A-CYLINDER' || el.tagName === 'A-SPHERE' || el.tagName === 'A-TORUS') {
+                        el.setAttribute('color', '#00f3ff');
+                        el.setAttribute('material', {
+                            opacity: 0.35,
+                            transparent: true,
+                            emissive: '#005577',
+                            emissiveIntensity: 1.0,
+                            shader: 'flat'
+                        });
+                    }
+                    for (let child of el.children) {
+                        colorize(ghost);
+                    }
+                };
+                colorize(ghost);
+
+                this.ghostContainer.appendChild(ghost);
+                this.ghostEl = ghost;
+            },
+
+            checkSnap: function (partEl) {
+                if (this.state !== 'TUTORIAL') return;
+                const step = STEPS[this.stepIndex];
+                if (partEl.id !== step.id) return;
+
+                const partPos = partEl.getAttribute('position');
+                const targetPos = step.targetPos;
+
+                // Calculate distance from Target
+                const dx = partPos.x - targetPos.x;
+                const dy = partPos.y - targetPos.y;
+                const dz = partPos.z - targetPos.z;
+                const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+
+                // Tolerance snaps within 0.22m
+                if (dist < 0.22) {
+                    this.snapPart(partEl, step);
+                } else {
+                    this.returnToSpawn(partEl);
+                }
+            },
+
+            snapPart: function (partEl, step) {
+                // Pin precisely
+                partEl.setAttribute('position', step.targetPos);
+                partEl.setAttribute('rotation', step.targetRot);
+                partEl.classList.add('snapped');
+                partEl.removeAttribute('grabbable');
+                partEl.setAttribute('material', 'emissive', '#000000');
+
+                // Remove ghost
+                if (this.ghostEl) {
+                    this.ghostContainer.removeChild(this.ghostEl);
+                    this.ghostEl = null;
+                }
+
+                // Snap sounds and particle effects
+                this.playSound('snap');
+                this.spawnParticles(step.targetPos);
+                
+                // Positive feedback indicators text flash
+                this.flashFeedbackText('GOOD JOB!');
+
+                // Advance Tutorial
+                setTimeout(() => {
+                    const nextIndex = this.stepIndex + 1;
+                    if (nextIndex >= STEPS.length) {
+                        this.completeSimulation();
+                    } else {
+                        this.loadStep(nextIndex);
+                    }
+                }, 400);
+            },
+
+            returnToSpawn: function (partEl) {
+                this.playSound('wrong');
+                this.playWrongPartFeedback(partEl);
+                
+                // Return to original spawn position stored on init
+                const grabComp = partEl.components.grabbable;
+                if (grabComp) {
+                    partEl.setAttribute('position', grabComp.spawnPosition);
+                    partEl.setAttribute('rotation', grabComp.spawnRotation);
+                }
+            },
+
+            playWrongPartFeedback: function (el) {
+                // Flash parts red briefly
+                const entities = [el, ...el.querySelectorAll('*')];
+                const originalColors = [];
+                
+                entities.forEach(ent => {
+                    if (ent.hasAttribute('color')) {
+                        originalColors.push({
+                            ent: ent,
+                            color: ent.getAttribute('color')
+                        });
+                        ent.setAttribute('color', '#ff0040');
+                        ent.setAttribute('material', 'emissive: #660000; emissiveIntensity: 1.5');
+                    }
+                });
+
+                setTimeout(() => {
+                    originalColors.forEach(item => {
+                        item.ent.setAttribute('color', item.color);
+                        item.ent.setAttribute('material', 'emissive: #000000; emissiveIntensity: 0');
+                    });
+                }, 300);
+            },
+
+            flashFeedbackText: function (val) {
+                this.feedbackTextEl.setAttribute('value', val);
+                this.feedbackTextEl.setAttribute('opacity', 1.0);
+                
+                // Animate text fading away
+                let count = 0;
+                const interval = setInterval(() => {
+                    count++;
+                    const opacity = 1.0 - (count / 15);
+                    this.feedbackTextEl.setAttribute('opacity', opacity);
+                    if (count >= 15) {
+                        clearInterval(interval);
+                        this.feedbackTextEl.setAttribute('value', '');
+                    }
+                }, 40);
+            },
+
+            spawnParticles: function (pos) {
+                // 10 small colorful sparks rising
+                const count = 10;
+                for (let i = 0; i < count; i++) {
+                    const p = document.createElement('a-sphere');
+                    p.setAttribute('radius', '0.012');
+                    p.setAttribute('color', '#00f3ff');
+                    p.setAttribute('material', 'shader: flat; opacity: 0.8; transparent: true');
+                    
+                    // Center offsets relative to engineGroup world space
+                    p.setAttribute('position', { x: pos.x, y: pos.y + 0.9, z: pos.z - 1.2 });
+                    
+                    const angle = Math.random() * Math.PI * 2;
+                    const phi = Math.acos(Math.random() * 2 - 1);
+                    const speed = 0.35 + Math.random() * 0.4;
+                    const vx = Math.sin(phi) * Math.cos(angle) * speed;
+                    const vy = Math.cos(phi) * speed + 0.5; // upward bias
+                    const vz = Math.sin(phi) * Math.sin(angle) * speed;
+
+                    this.el.sceneEl.appendChild(p);
+
+                    let age = 0;
+                    const life = 50;
+                    const timer = setInterval(() => {
+                        age++;
+                        if (age >= life) {
+                            clearInterval(timer);
+                            if (p.parentNode) p.parentNode.removeChild(p);
+                            return;
+                        }
+                        const cur = p.getAttribute('position');
+                        p.setAttribute('position', {
+                            x: cur.x + vx * 0.016,
+                            y: cur.y + vy * 0.016,
+                            z: cur.z + vz * 0.016
+                        });
+                        p.setAttribute('material', 'opacity', 0.8 * (1.0 - age / life));
+                    }, 16);
+                }
+            },
+
+            completeSimulation: function () {
+                this.state = 'COMPLETED';
+                this.playSound('complete');
+                
+                // Show completion messages
+                this.stepNumberEl.setAttribute('value', 'CONGRATULATIONS!');
+                this.stepNameEl.setAttribute('value', 'ENGINE ASSEMBLED!');
+                this.stepDescEl.setAttribute('value', 'You successfully assembled the car engine! Enjoy looking at the rotating motor assembly.');
+                
+                this.progressTextEl.setAttribute('value', `Progress: 15 / 15 steps (100%)`);
+                this.progressBarEl.setAttribute('width', 0.72);
+
+                // Rotate the completed engine Assembly slowly for showcase
+                const engineGroup = document.getElementById('engineGroup');
+                engineGroup.setAttribute('animation', {
+                    property: 'rotation',
+                    to: '0 360 0',
+                    loop: true,
+                    dur: 9000,
+                    easing: 'linear'
+                });
+
+                // Display HTML Completion modal fallback for desktop users
+                setTimeout(() => {
+                    const overlayComp = document.getElementById('completionOverlay');
+                    if (overlayComp && !this.el.sceneEl.is('vr-mode')) {
+                        overlayComp.style.display = 'flex';
+                    }
+                }, 1000);
+            },
+
+            resetSimulation: function () {
+                this.state = 'TUTORIAL';
+                this.stepIndex = 0;
+
+                // Stop spinning
+                const engineGroup = document.getElementById('engineGroup');
+                engineGroup.removeAttribute('animation');
+                engineGroup.setAttribute('rotation', '0 0 0');
+
+                // Return all parts to spawn zones
+                STEPS.forEach(s => {
+                    const el = document.getElementById(s.id);
+                    if (el) {
+                        el.classList.remove('snapped');
+                        
+                        // Re-enable grabbable
+                        if (!el.hasAttribute('grabbable')) {
+                            el.setAttribute('grabbable', '');
+                        }
+                        
+                        const grabComp = el.components.grabbable;
+                        if (grabComp) {
+                            el.setAttribute('position', grabComp.spawnPosition);
+                            el.setAttribute('rotation', grabComp.spawnRotation);
+                        }
+                    }
+                });
+
+                this.loadStep(0);
+            },
+
+            exitToMenu: function () {
+                this.state = 'START_MENU';
+                this.stepIndex = 0;
+
+                // Stop engine rotation
+                const engineGroup = document.getElementById('engineGroup');
+                engineGroup.removeAttribute('animation');
+                engineGroup.setAttribute('rotation', '0 0 0');
+
+                // Hide play buttons, show start button
+                this.btnStart3D.setAttribute('visible', 'true');
+                this.btnRestart3D.setAttribute('visible', 'false');
+                this.btnExit3D.setAttribute('visible', 'false');
+                
+                this.btnStart3D.classList.add('interactive');
+                this.btnRestart3D.classList.remove('interactive');
+                this.btnExit3D.classList.remove('interactive');
+
+                // Clear texts and ghost
+                this.stepNumberEl.setAttribute('value', 'START SCREEN');
+                this.stepNameEl.setAttribute('value', 'Engine Assembly');
+                this.stepDescEl.setAttribute('value', 'Press Start Simulation below or in the HTML overlay to enter the workshop.');
+                this.progressTextEl.setAttribute('value', 'Progress: 0 / 15 steps (0%)');
+                this.progressBarEl.setAttribute('width', 0.001);
+
+                if (this.ghostEl) {
+                    this.ghostContainer.removeChild(this.ghostEl);
+                    this.ghostEl = null;
+                }
+
+                // Return parts and lock them
+                STEPS.forEach(s => {
+                    const el = document.getElementById(s.id);
+                    if (el) {
+                        el.classList.remove('snapped');
+                        if (!el.hasAttribute('grabbable')) {
+                            el.setAttribute('grabbable', '');
+                        }
+                        const grabComp = el.components.grabbable;
+                        if (grabComp) {
+                            el.setAttribute('position', grabComp.spawnPosition);
+                            el.setAttribute('rotation', grabComp.spawnRotation);
+                        }
+                    }
+                });
+                this.lockAllParts();
+            },
+
+            handleButtonAction: function (action) {
+                if (action === 'start') {
+                    // Start simulator from 3D button
+                    document.getElementById('startOverlay').style.display = 'none';
+                    this.startWorkshop();
+                } else if (action === 'restart') {
+                    this.resetSimulation();
+                } else if (action === 'exit') {
+                    exitApp();
+                }
+            }
+        });
+
+        // Reusable Grabbing Logic supporting Desktop Pointer and VR Squeeze controller events
+        AFRAME.registerComponent('grabbable', {
+            init: function () {
+                this.el.classList.add('grabbable');
+                this.grabber = null;
+                this.spawnPosition = Object.assign({}, this.el.getAttribute('position'));
+                this.spawnRotation = Object.assign({}, this.el.getAttribute('rotation'));
+
+                this.tempVec = new THREE.Vector3();
+                this.tempQuat = new THREE.Quaternion();
+                this.tempScale = new THREE.Vector3();
+
+                // Mouse/Raycaster clicks
+                this.el.addEventListener('mousedown', this.onGrab.bind(this));
+            },
+
+            onGrab: function (evt) {
+                if (this.el.classList.contains('snapped')) return;
+
+                // Validate if this part is correct for the active assembly step
+                const simManager = document.querySelector('[simulation-manager]').components['simulation-manager'];
+                if (!simManager.isPartActive(this.el.id)) {
+                    simManager.playWrongPartFeedback(this.el);
+                    return;
+                }
+
+                const cursor = evt.detail.cursorEl;
+                if (!cursor) return;
+
+                this.grabber = cursor;
+                simManager.playSound('grab');
+                this.el.setAttribute('material', 'emissive', '#253545');
+
+                // Determine target grab distance: VR controller or Desktop cursor camera
+                const isVRController = cursor.id.includes('Controller') || cursor.hasAttribute('laser-controls');
+                this.grabOffsetZ = isVRController ? -0.22 : -1.2;
+
+                // Listen for button release on the cursor/controller
+                this.onReleaseBind = this.onRelease.bind(this);
+                cursor.addEventListener('mouseup', this.onReleaseBind);
+                cursor.addEventListener('triggerup', this.onReleaseBind);
+                cursor.addEventListener('gripup', this.onReleaseBind);
+            },
+
+            onRelease: function () {
+                if (!this.grabber) return;
+
+                const cursor = this.grabber;
+                cursor.removeEventListener('mouseup', this.onReleaseBind);
+                cursor.removeEventListener('triggerup', this.onReleaseBind);
+                cursor.removeEventListener('gripup', this.onReleaseBind);
+
+                this.grabber = null;
+                this.el.setAttribute('material', 'emissive', '#000000');
+
+                // Check snap target bounds
+                const simManager = document.querySelector('[simulation-manager]').components['simulation-manager'];
+                simManager.checkSnap(this.el);
+            },
+
+            tick: function () {
+                if (!this.grabber) return;
+
+                // Real-time translation to follow cursor/controller world vector
+                this.grabber.object3D.updateMatrixWorld();
+                this.grabber.object3D.matrixWorld.decompose(this.tempVec, this.tempQuat, this.tempScale);
+
+                // Set offset point in front of controller pointer
+                const offsetVec = new THREE.Vector3(0, 0, this.grabOffsetZ);
+                offsetVec.applyQuaternion(this.tempQuat);
+                this.tempVec.add(offsetVec);
+
+                // Map world coordinate back to local parent space
+                this.el.parentNode.object3D.worldToLocal(this.tempVec);
+                this.el.setAttribute('position', this.tempVec);
+
+                // Map rotation quaternion back to local parent space
+                const parentQuat = new THREE.Quaternion();
+                this.el.parentNode.object3D.getWorldQuaternion(parentQuat);
+                this.tempQuat.premultiply(parentQuat.invert());
+
+                const euler = new THREE.Euler().setFromQuaternion(this.tempQuat, 'YXZ');
+                this.el.setAttribute('rotation', {
+                    x: THREE.MathUtils.radToDeg(euler.x),
+                    y: THREE.MathUtils.radToDeg(euler.y),
+                    z: THREE.MathUtils.radToDeg(euler.z)
+                });
+            }
+        });
+
+        // VR Controller Squeeze triggers grabber emulator component
+        AFRAME.registerComponent('vr-controller-grabber', {
+            init: function () {
+                const el = this.el;
+
+                const handleGrab = () => {
+                    const raycaster = el.components.raycaster;
+                    if (!raycaster) return;
+                    const intersected = raycaster.intersectedEls;
+                    if (intersected && intersected.length > 0) {
+                        const target = intersected[0];
+                        if (target.classList.contains('grabbable')) {
+                            target.emit('mousedown', { cursorEl: el }, false);
+                        } else if (target.classList.contains('interactive')) {
+                            target.emit('mousedown', { cursorEl: el }, false);
+                        }
+                    }
+                };
+
+                const handleRelease = () => {
+                    el.emit('mouseup', { cursorEl: el }, false);
+                };
+
+                el.addEventListener('triggerdown', handleGrab);
+                el.addEventListener('gripdown', handleGrab);
+                el.addEventListener('triggerup', handleRelease);
+                el.addEventListener('gripup', handleRelease);
+            }
+        });
+
+        // Custom 3D interactive HUD button component
+        AFRAME.registerComponent('interactive-button', {
+            schema: {
+                text: { type: 'string', default: 'BUTTON' },
+                action: { type: 'string', default: '' },
+                width: { type: 'number', default: 0.35 },
+                height: { type: 'number', default: 0.12 }
+            },
+            init: function () {
+                const data = this.data;
+                const el = this.el;
+                el.classList.add('interactive');
+
+                // Button backplate plane
+                const bg = document.createElement('a-plane');
+                bg.setAttribute('width', data.width);
+                bg.setAttribute('height', data.height);
+                bg.setAttribute('color', '#091535');
+                bg.setAttribute('material', 'emissive: #040920; metalness: 0.5; roughness: 0.1');
+                el.appendChild(bg);
+                this.bg = bg;
+
+                // Button text overlay
+                const text = document.createElement('a-text');
+                text.setAttribute('value', data.text);
+                text.setAttribute('align', 'center');
+                text.setAttribute('width', 1.3);
+                text.setAttribute('color', '#ffffff');
+                text.setAttribute('position', '0 0 0.01');
+                text.setAttribute('font', 'monoid');
+                el.appendChild(text);
+
+                // Hover styling changes
+                el.addEventListener('mouseenter', () => {
+                    bg.setAttribute('color', '#00f3ff');
+                    bg.setAttribute('material', 'emissive', '#004c55');
+                    synth.play('click');
+                });
+
+                el.addEventListener('mouseleave', () => {
+                    bg.setAttribute('color', '#091535');
+                    bg.setAttribute('material', 'emissive', '#040920');
+                });
+
+                // Squeeze click trigger activation
+                el.addEventListener('mousedown', () => {
+                    bg.setAttribute('color', '#ff00a0');
+                    bg.setAttribute('material', 'emissive', '#500030');
+                    synth.play('grab');
+
+                    setTimeout(() => {
+                        bg.setAttribute('color', '#091535');
+                        bg.setAttribute('material', 'emissive', '#040920');
+                        
+                        // Execute action callback in simulation-manager
+                        const sim = document.querySelector('[simulation-manager]').components['simulation-manager'];
+                        sim.handleButtonAction(data.action);
+                    }, 150);
+                });
+            }
+        });
+    </script>
 </body>
 
 </html>
