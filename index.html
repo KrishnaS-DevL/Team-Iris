@@ -178,6 +178,7 @@
                 <button onclick="startSimulation()">Start Simulation</button>
                 <button class="secondary" onclick="exitApp()">Exit</button>
             </div>
+            <div style="font-size: 0.8rem; color: #ff00a0; margin-top: 20px; font-family: monospace; letter-spacing: 1px;">last change: Aug 24, 2026, 4:09 PM</div>
         </div>
     </div>
 
@@ -795,7 +796,7 @@
                 <a-text id="stepName" value="Engine Assembly" position="-0.36 0.28 0.01" color="#00f3ff" font="monoid" width="2.6" bold="true"></a-text>
                 
                 <!-- Main description wrap instructions -->
-                <a-text id="stepDesc" value="Press Start Simulation below or in the HTML overlay to enter the workshop." 
+                <a-text id="stepDesc" value="Press Start Simulation below or in the HTML overlay to enter the workshop. last change: Aug 24, 2026, 4:09 PM" 
                         position="-0.36 0.08 0.01" color="#ffffff" font="monoid" width="1.9" wrap-count="30"></a-text>
                 
                 <!-- Feedback success label -->
@@ -1020,19 +1021,14 @@
                 this.ghostEl = ghost;
             },
 
-            checkSnap: function (partEl) {
+            checkSnapWithWorldPos: function (partEl, worldPos) {
                 if (this.state !== 'TUTORIAL') return;
                 const step = STEPS[this.stepIndex];
                 if (partEl.id !== step.id) return;
 
-                const partPos = partEl.getAttribute('position');
-                const targetPos = step.targetPos;
-
-                // Calculate distance from Target
-                const dx = partPos.x - targetPos.x;
-                const dy = partPos.y - targetPos.y;
-                const dz = partPos.z - targetPos.z;
-                const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+                // Target world position (since engineGroup is centered at x=0, y=0, z=-1.2)
+                const targetWorldPos = new THREE.Vector3(step.targetPos.x, step.targetPos.y, step.targetPos.z - 1.2);
+                const dist = worldPos.distanceTo(targetWorldPos);
 
                 // Tolerance snaps within 0.22m
                 if (dist < 0.22) {
@@ -1251,7 +1247,7 @@
                 // Clear texts and ghost
                 this.stepNumberEl.setAttribute('value', 'START SCREEN');
                 this.stepNameEl.setAttribute('value', 'Engine Assembly');
-                this.stepDescEl.setAttribute('value', 'Press Start Simulation below or in the HTML overlay to enter the workshop.');
+                this.stepDescEl.setAttribute('value', 'Press Start Simulation below or in the HTML overlay to enter the workshop. last change: Aug 24, 2026, 4:09 PM');
                 this.progressTextEl.setAttribute('value', 'Progress: 0 / 15 steps (0%)');
                 this.progressBarEl.setAttribute('width', 0.001);
 
@@ -1298,6 +1294,7 @@
                 this.grabber = null;
                 this.spawnPosition = Object.assign({}, this.el.getAttribute('position'));
                 this.spawnRotation = Object.assign({}, this.el.getAttribute('rotation'));
+                this.originalThreeParent = this.el.object3D.parent;
 
                 this.tempVec = new THREE.Vector3();
                 this.tempQuat = new THREE.Quaternion();
@@ -1317,8 +1314,25 @@
                     return;
                 }
 
-                const cursor = evt.detail.cursorEl;
-                if (!cursor) return;
+                let cursor = evt.detail.cursorEl;
+                if (!cursor) {
+                    const sceneEl = document.querySelector('a-scene');
+                    if (sceneEl.is('vr-mode')) {
+                        const left = document.getElementById('leftController');
+                        const right = document.getElementById('rightController');
+                        const isPointing = (ctrl) => {
+                            const ray = ctrl.components.raycaster;
+                            return ray && ray.intersectedEls.some(intersected => 
+                                intersected === this.el || this.el.contains(intersected)
+                            );
+                        };
+                        if (isPointing(left)) cursor = left;
+                        else if (isPointing(right)) cursor = right;
+                        else cursor = right;
+                    } else {
+                        cursor = document.getElementById('desktopCursor');
+                    }
+                }
 
                 this.grabber = cursor;
                 simManager.playSound('grab');
@@ -1326,7 +1340,12 @@
 
                 // Determine target grab distance: VR controller or Desktop cursor camera
                 const isVRController = cursor.id.includes('Controller') || cursor.hasAttribute('laser-controls');
-                this.grabOffsetZ = isVRController ? -0.22 : -1.2;
+                this.grabOffsetZ = isVRController ? -0.25 : -1.2;
+
+                // Reparent Three.js Object3D for smooth lag-free rendering following the controller
+                this.grabber.object3D.add(this.el.object3D);
+                this.el.object3D.position.set(0, 0, this.grabOffsetZ);
+                this.el.object3D.rotation.set(0, 0, 0);
 
                 // Listen for button release on the cursor/controller
                 this.onReleaseBind = this.onRelease.bind(this);
@@ -1344,40 +1363,57 @@
                 cursor.removeEventListener('gripup', this.onReleaseBind);
 
                 this.grabber = null;
+
+                // Compute world coordinates before reparenting
+                const worldPos = new THREE.Vector3();
+                this.el.object3D.getWorldPosition(worldPos);
+
+                // Restore original Three parent
+                this.originalThreeParent.add(this.el.object3D);
+
+                // Check snap target bounds using world coordinate systems
                 const simManager = document.querySelector('[simulation-manager]').components['simulation-manager'];
                 simManager.setPartAppearance(this.el, 1.0, false, '#000000');
-
-                // Check snap target bounds
-                simManager.checkSnap(this.el);
+                simManager.checkSnapWithWorldPos(this.el, worldPos);
             },
 
             tick: function () {
                 if (!this.grabber) return;
 
-                // Real-time translation to follow cursor/controller world vector
-                this.grabber.object3D.updateMatrixWorld();
-                this.grabber.object3D.matrixWorld.decompose(this.tempVec, this.tempQuat, this.tempScale);
+                // Check proximity distance in world coordinate frame
+                const worldPos = new THREE.Vector3();
+                this.el.object3D.getWorldPosition(worldPos);
 
-                // Set offset point in front of controller pointer
-                const offsetVec = new THREE.Vector3(0, 0, this.grabOffsetZ);
-                offsetVec.applyQuaternion(this.tempQuat);
-                this.tempVec.add(offsetVec);
-
-                // Map world coordinate back to local parent space
-                this.el.parentNode.object3D.worldToLocal(this.tempVec);
-                this.el.setAttribute('position', this.tempVec);
-
-                // Map rotation quaternion back to local parent space
-                const parentQuat = new THREE.Quaternion();
-                this.el.parentNode.object3D.getWorldQuaternion(parentQuat);
-                this.tempQuat.premultiply(parentQuat.invert());
-
-                const euler = new THREE.Euler().setFromQuaternion(this.tempQuat, 'YXZ');
-                this.el.setAttribute('rotation', {
-                    x: THREE.MathUtils.radToDeg(euler.x),
-                    y: THREE.MathUtils.radToDeg(euler.y),
-                    z: THREE.MathUtils.radToDeg(euler.z)
-                });
+                const simManager = document.querySelector('[simulation-manager]').components['simulation-manager'];
+                const step = STEPS[simManager.stepIndex];
+                if (step && this.el.id === step.id) {
+                    const targetWorldPos = new THREE.Vector3(step.targetPos.x, step.targetPos.y, step.targetPos.z - 1.2);
+                    const dist = worldPos.distanceTo(targetWorldPos);
+                    
+                    if (dist < 0.22) {
+                        simManager.setPartAppearance(this.el, 1.0, false, '#00ff88');
+                        if (simManager.ghostEl) {
+                            simManager.ghostEl.setAttribute('material', {
+                                opacity: 0.55,
+                                transparent: true,
+                                emissive: '#00ff88',
+                                emissiveIntensity: 1.5,
+                                shader: 'flat'
+                            });
+                        }
+                    } else {
+                        simManager.setPartAppearance(this.el, 1.0, false, '#253545');
+                        if (simManager.ghostEl) {
+                            simManager.ghostEl.setAttribute('material', {
+                                opacity: 0.35,
+                                transparent: true,
+                                emissive: '#005577',
+                                emissiveIntensity: 1.0,
+                                shader: 'flat'
+                            });
+                        }
+                    }
+                }
             }
         });
 
@@ -1386,15 +1422,24 @@
             init: function () {
                 const el = this.el;
 
+                const findGrabbable = (element) => {
+                    let curr = element;
+                    while (curr && curr !== el.sceneEl) {
+                        if (curr.classList && (curr.classList.contains('grabbable') || curr.classList.contains('interactive'))) {
+                            return curr;
+                        }
+                        curr = curr.parentNode;
+                    }
+                    return null;
+                };
+
                 const handleGrab = () => {
                     const raycaster = el.components.raycaster;
                     if (!raycaster) return;
                     const intersected = raycaster.intersectedEls;
                     if (intersected && intersected.length > 0) {
-                        const target = intersected[0];
-                        if (target.classList.contains('grabbable')) {
-                            target.emit('mousedown', { cursorEl: el }, false);
-                        } else if (target.classList.contains('interactive')) {
+                        const target = findGrabbable(intersected[0]);
+                        if (target) {
                             target.emit('mousedown', { cursorEl: el }, false);
                         }
                     }
