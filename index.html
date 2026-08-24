@@ -567,7 +567,7 @@
             <a-camera id="camera" look-controls="pointerLockEnabled: false" wasd-controls="acceleration: 15" position="0 1.6 0">
                 <!-- Desktop Cursor -->
                 <a-cursor id="desktopCursor"
-                          raycaster="objects: .interactive, .grabbable; far: 4"
+                          raycaster="objects: .interactive, .grabbable, .grabbable *; far: 4"
                           material="color: #00f3ff; shader: flat; opacity: 0.8"
                           geometry="primitive: ring; radiusInner: 0.006; radiusOuter: 0.011"
                           visible="true">
@@ -576,13 +576,13 @@
 
             <!-- VR Gloved Controller Hands with Laser pointer rays -->
             <a-entity id="leftController" hand-controls="hand: left; handModelStyle: lowPoly; color: #1b264f"
-                      raycaster="objects: .interactive, .grabbable; far: 3; interval: 100; showLine: true"
+                      raycaster="objects: .interactive, .grabbable, .grabbable *; far: 3; interval: 100; showLine: true"
                       line="color: #00f3ff; opacity: 0.8"
                       vr-controller-grabber>
             </a-entity>
             
             <a-entity id="rightController" hand-controls="hand: right; handModelStyle: lowPoly; color: #1b264f"
-                      raycaster="objects: .interactive, .grabbable; far: 3; interval: 100; showLine: true"
+                      raycaster="objects: .interactive, .grabbable, .grabbable *; far: 3; interval: 100; showLine: true"
                       line="color: #00f3ff; opacity: 0.8"
                       vr-controller-grabber>
             </a-entity>
@@ -897,12 +897,26 @@
                 synth.play(type);
             },
 
+            setPartAppearance: function (el, opacity, transparent, emissiveHex) {
+                if (!el) return;
+                const entities = [el, ...el.querySelectorAll('*')];
+                entities.forEach(ent => {
+                    if (ent.tagName === 'A-BOX' || ent.tagName === 'A-CYLINDER' || ent.tagName === 'A-SPHERE' || ent.tagName === 'A-TORUS') {
+                        ent.setAttribute('material', {
+                            opacity: opacity,
+                            transparent: transparent,
+                            emissive: emissiveHex,
+                            emissiveIntensity: emissiveHex !== '#000000' ? 0.8 : 0.0
+                        });
+                    }
+                });
+            },
+
             lockAllParts: function () {
                 STEPS.forEach(s => {
                     const el = document.getElementById(s.id);
                     if (el) {
-                        el.setAttribute('material', 'opacity', 0.55);
-                        el.setAttribute('material', 'transparent', true);
+                        this.setPartAppearance(el, 0.4, true, '#000000');
                     }
                 });
             },
@@ -953,14 +967,10 @@
                     if (el) {
                         if (idx === index) {
                             // Active part glow and solid color
-                            el.setAttribute('material', 'opacity', 1.0);
-                            el.setAttribute('material', 'transparent', false);
-                            el.setAttribute('material', 'emissive', '#152535');
+                            this.setPartAppearance(el, 1.0, false, '#152535');
                         } else if (idx > index) {
                             // Locked future parts
-                            el.setAttribute('material', 'opacity', 0.4);
-                            el.setAttribute('material', 'transparent', true);
-                            el.setAttribute('material', 'emissive', '#000000');
+                            this.setPartAppearance(el, 0.4, true, '#000000');
                         }
                     }
                 });
@@ -1001,7 +1011,7 @@
                         });
                     }
                     for (let child of el.children) {
-                        colorize(ghost);
+                        colorize(child);
                     }
                 };
                 colorize(ghost);
@@ -1038,7 +1048,7 @@
                 partEl.setAttribute('rotation', step.targetRot);
                 partEl.classList.add('snapped');
                 partEl.removeAttribute('grabbable');
-                partEl.setAttribute('material', 'emissive', '#000000');
+                this.setPartAppearance(partEl, 1.0, false, '#000000');
 
                 // Remove ghost
                 if (this.ghostEl) {
@@ -1312,7 +1322,7 @@
 
                 this.grabber = cursor;
                 simManager.playSound('grab');
-                this.el.setAttribute('material', 'emissive', '#253545');
+                simManager.setPartAppearance(this.el, 1.0, false, '#253545');
 
                 // Determine target grab distance: VR controller or Desktop cursor camera
                 const isVRController = cursor.id.includes('Controller') || cursor.hasAttribute('laser-controls');
@@ -1334,10 +1344,10 @@
                 cursor.removeEventListener('gripup', this.onReleaseBind);
 
                 this.grabber = null;
-                this.el.setAttribute('material', 'emissive', '#000000');
+                const simManager = document.querySelector('[simulation-manager]').components['simulation-manager'];
+                simManager.setPartAppearance(this.el, 1.0, false, '#000000');
 
                 // Check snap target bounds
-                const simManager = document.querySelector('[simulation-manager]').components['simulation-manager'];
                 simManager.checkSnap(this.el);
             },
 
